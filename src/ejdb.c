@@ -7,6 +7,7 @@
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
+#include "stdio.h"
 
 #define EJDB_DATABASE_META "EJDB*"
 #define EJDB_QUERY_META "JQL*"
@@ -34,8 +35,12 @@
   }
 
 int ejdb_lua_ejdb_gc(lua_State* L) {
+    printf("ejdb_lua_ejdb_gc  ejdb_lua_ejdb_gcejdb_lua_ejdb_gc \n"  );
+
   EJDB* db = luaL_checkudata(L, 1, EJDB_DATABASE_META);
-  EJDB_LUA_ERROR(ejdb_close(db));
+  if(db){
+    EJDB_LUA_ERROR(ejdb_close(db));
+  }
   return 0;
 }
 
@@ -206,8 +211,10 @@ void jql_set_str2_stdfree(void* str, void* op) {
 // @return[2] nil
 // @treturn[2] string Error Message
 int ejdb_lua_open(lua_State* L) {
+    printf("aaaaaaaaaaaaaaaaaa  \n" );
   const char* file = luaL_checkstring(L, 1);
   const char* mode_string = luaL_checkstring(L, 2);
+  printf("bbbbbbbbbbbbbbbbbbbb \n" );
   iwkv_openflags mode = 0;
   while (mode_string[0]) {
     if (mode_string[0] == 'w') {
@@ -218,12 +225,29 @@ int ejdb_lua_open(lua_State* L) {
       return luaL_error(L, "invalid character in open mode: %c", mode_string[0]);
     mode_string++;
   }
+  printf("cccccccccccccccccc %s \n" ,file);
   EJDB_OPTS opts = {.kv = {.path = file, .oflags = mode}};
-  EJDB* db = lua_newuserdata(L, sizeof(EJDB));
+    printf("ddddddddddddddddddddddddd  %d \n",   lua_gettop(L)  );
+    printf("ddddddddddddddddddddddddd   %d \n" ,sizeof(EJDB));
+//    EJDB* dbs= lua_newuserdata(L,20000);
+//    lua_pop(L, 1);
+    double MemCount = (double)lua_gc(L, LUA_GCCOUNTB, 0) + (double)(lua_gc(L, LUA_GCCOUNT, 0) * 1024);
+    printf("ddddddddddddddddddddddddd3   %d \n" ,MemCount);
+
+    printf("ddddddddddddddddddddddddd  %x \n",  L );
+
+    EJDB* db = lua_newuserdata(L, sizeof(EJDB));
+    printf("ddddddddddddddddddddddddd  %d \n",   lua_gettop(L)  );
+
+    printf("eeeeeeeeeeeeeeeeeeeeee \n" );
+
   EJDB_LUA_ASSERT(ejdb_open(&opts, db));
+  printf("fffffffffffffffffff \n" );
 
   luaL_getmetatable(L, EJDB_DATABASE_META);
   lua_setmetatable(L, -2);
+  printf("gggggggggggggggggggggggggggggg \n" );
+
   return 1;
 }
 
@@ -259,6 +283,9 @@ int ejdb_lua_ejdb_put(lua_State* L) {
   iwrc rc;
   JBL jbl;
   int64_t id;
+  double MemCount = (double)lua_gc(L, LUA_GCCOUNTB, 0) + (double)(lua_gc(L, LUA_GCCOUNT, 0) * 1024);
+  printf("ddddddddddddddddddddddddd55   %d \n" ,MemCount);
+//    lua_gc(L, LUA_GCCOLLECT, 0);
   EJDB* db = luaL_checkudata(L, 1, EJDB_DATABASE_META);
   int coll_idx = 2;
   bool use_index = false;
@@ -306,6 +333,7 @@ int ejdb_lua_ejdb_exec(lua_State* L) {
 // @function close
 int ejdb_lua_ejdb_close(lua_State* L) {
   EJDB* db = luaL_checkudata(L, 1, EJDB_DATABASE_META);
+  printf("ejdb_lua_ejdb_close \n");
   EJDB_LUA_ERROR(ejdb_close(db));
   return 0;
 }
@@ -571,4 +599,11 @@ int luaopen_ejdb(lua_State* L) {
   lua_pushcfunction(L, ejdb_lua_query);
   lua_setfield(L, -2, "query");
   return 1;
+}
+
+
+int main(void)
+{
+    printf("I love you. \n");
+    return 0;
 }

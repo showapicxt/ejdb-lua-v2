@@ -1,0 +1,16 @@
+project(lua-ejdb)
+
+set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+SET(CMAKE_C_FLAGS  "-O2 -pipe -fPIC -Wall -fmessage-length=0")
+
+include_directories(/usr/local/include)
+include_directories(/usr/lib64)
+include_directories(/data/ejdb-master/src)
+include_directories(/usr/local/openresty/luajit/include/luajit-2.1)
+
+LINK_DIRECTORIES(/usr/local/openresty/luajit/lib/)
+link_libraries(m luajit-5.1 ejdb2 dl)
+add_library(lua-ejdb SHARED src/ejdb.c)
+add_library(hello_library STATIC src/ejdb.c)
+add_executable(tttttt src/ejdb.c)
