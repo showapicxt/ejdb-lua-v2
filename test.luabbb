@@ -1,0 +1,63 @@
+local function decode(t,int)
+    int=int or 0
+    for k,v in pairs(t) do
+        if type(v)=="table" then print(string.rep("/t",int),k) decode(v,int+1) else print(string.rep("/t",int),k,v) end
+    end
+end
+print("dddddddddddddddddddd")
+package.cpath=package.cpath..";E:/c_workspace/ejdb-lua-v2/cmake-build-debug/lib/libejdb.dll"
+--package.cpath=package.cpath..";/data/ejdb-lua/lib/liblua-ejdb.so"
+
+
+local ejdb=require"ejdb"
+local now=   os.time()
+local db = ejdb.open("c:/test.db","w")
+--local db = ejdb.open("/test.db","w")
+for i=1,10000 do
+    print("-------------------query",i)
+
+
+        --db:ensure_index("parrots","/name","us")
+--    local id=db:put(  "parrots",{name="Bianca",age=4})
+    print("111111111111111 " )
+    local t=db:put(now..i,"docs", {name = "Doc 1", age = now..""..i})
+    print("222222222222222222 " ,t,"           ",now..""..i)
+
+    --      assert(db:put(8,"parrots","{/"name/":/"Darko/", /"age/":8}"))
+
+--    do
+--            local q=assert(ejdb.query("parrots","/*"))
+--            local aa=db:exec(q,function() end)
+--            assert(db:exec(q,function(id,data)
+--              print(id)
+--              decode(data)
+--
+--            end))
+--    end
+    print("2222222222222")
+    --do
+    --  print("Ageing up Bianca")
+    --  assert(db:exec(ejdb.query("parrots",'/[name = Bianca] | apply {"age": 5}'),function()end))
+    --end
+    --do
+    --  print("Deleting Darko")
+    --  --assert(db:exec(ejdb.query("parrots",'/[name = Darko] | del'),function()end))
+    --  assert(db:del("parrots",8))
+    --end
+  --do
+  --    print("Querying parrots")
+  --    local q=assert(ejdb.query("docs","/*"))
+  --    assert(db:exec(q,function(id,data) decode(data) end))
+  --    --print("Queryed parrots")
+  --end
+  -- print("quering parrot 1")
+  --  decode(assert(db:get("parrots",1)))
+  --  decode(db:get_meta())
+
+end
+db:close()
+
+--os.execute("ping -n  5 localhost > NUL")
+
+
+

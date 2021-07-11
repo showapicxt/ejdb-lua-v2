@@ -56,32 +56,22 @@ int ejdb_lua_query_gc(lua_State* L) {
 }
 
 iwrc ejdb_lua_jbl_from_lua(lua_State* L, int index, JBL* output);
-
-//#define LUA_TNIL		0
-//#define LUA_TBOOLEAN		1
-//#define LUA_TLIGHTUSERDATA	2
-//#define LUA_TNUMBER		3
-//#define LUA_TSTRING		4
-//#define LUA_TTABLE		5
-//#define LUA_TFUNCTION		6
-//#define LUA_TUSERDATA		7
-//#define LUA_TTHREAD		8
-
 iwrc ejdb_lua_jbl_from_lua_set_field(lua_State* L, int index, const char* key, JBL* output) {
   iwrc rc;
-  int data_type=lua_type(L,index);
-  if (data_type == LUA_TTABLE) {
+  if (lua_istable(L, index)) {
     JBL nested;
     ejdb_lua_jbl_from_lua(L, index, &nested);
     if ((rc = jbl_set_nested(*output, key, nested)))
       return rc;
     jbl_destroy(&nested);
-  } else if (data_type == LUA_TSTRING) {
-    jbl_set_string(*output, key, luaL_checkstring(L, index));
-  }else if (data_type == LUA_TBOOLEAN) {
+  } else if (lua_isboolean(L, index)) {
     jbl_set_bool(*output, key, lua_toboolean(L, index));
-  } else if (data_type == LUA_TNUMBER) {
+  } else if (lua_isinteger(L, index)) {
+    jbl_set_i64(*output, key, lua_tointeger(L, index));
+  } else if (lua_isnumber(L, index)) {
     jbl_set_f64(*output, key, lua_tonumber(L, index));
+  } else if (lua_isstring(L, index)) {
+    jbl_set_string(*output, key, luaL_checkstring(L, index));
   } else {
     luaL_error(L, "invalid type to serialize: %s", lua_typename(L, lua_type(L, index)));
     return 0;
@@ -204,10 +194,6 @@ iwrc ejdb_lua_push_jbl(lua_State* L, JBL* jbl) {
 
 iwrc ejdb_lua_push_jbl_node(lua_State* L, JBL_NODE * node) {
   iwrc rc;
-  printf("\n ejdb_lua_push_jbl_node in  " );
-
-  printf("\n node type is  %d \n " ,(*node)->type);
-
   switch ((*node)->type) {
   case JBV_NONE: {
     lua_pushnil(L);
@@ -216,40 +202,33 @@ iwrc ejdb_lua_push_jbl_node(lua_State* L, JBL_NODE * node) {
     lua_pushnil(L);
   } break;
   case JBV_BOOL: {
-    lua_pushboolean(L, (*node)->vbool);
+    lua_pushboolean(L, jbl_get_i32(*jbl));
   } break;
   case JBV_I64: {
-//    printf("\n eeeeeeeeeeeeeeeeeeeeeee  %d " ,(*node)->vi64);
-    lua_pushinteger(L, (*node)->vi64);
+    lua_pushinteger(L, jbl_get_i64(*jbl));
   } break;
   case JBV_F64: {
-//    printf("\n eeeeeeeeeeeeeeeeeeeeeee  %d " ,(*node)->vf64);
-
-    lua_pushnumber(L, (*node)->vf64);
+    lua_pushnumber(L, jbl_get_f64(*jbl));
   } break;
   case JBV_STR: {
-    lua_pushlstring(L, (*node)->vptr, strlen((*node)->vptr));
+    lua_pushstring(L, jbl_get_str(*jbl));
   } break;
   case JBV_OBJECT: {
     lua_newtable(L);
-    for (JBL_NODE n = (*node)->child; n; n = n->next) {
-      char *key=n->key;
-      printf("\n key is :  %s   \n" ,key);
-//      printf("\n dddddddddddddddssss   %s    %d " ,n->vptr,n->type);
-      lua_pushlstring(L, key, strlen(key));
-      printf("\n eeeeeeeeeeeeeeeeeeeeeeeeeeee2  " );
-
-      ejdb_lua_push_jbl_node(L,&n);
-//      lua_pushlstring(L, n->vptr, strlen(n->vptr));
+    JBL holder = 0;
+    JBL_iterator it;
+    char* key;
+    int klen;
+    if ((rc = jbl_create_iterator_holder(&holder)))
+      return rc;
+    if ((rc = jbl_iterator_init(*jbl, &it)))
+      return rc;
+    while (jbl_iterator_next(&it, holder, &key, &klen)) {
+      lua_pushlstring(L, key, klen);
+      ejdb_lua_push_jbl(L, &holder);
       lua_settable(L, -3);
-      printf("\n ffffffffffffffffffffffff  " );
-
     }
-//    while (jbl_iterator_next(&it, holder, &key, &klen)) {
-//      lua_pushlstring(L, key, klen);
-//      ejdb_lua_push_jbl(L, &holder);
-//      lua_settable(L, -3);
-//    }
+    jbl_destroy(&holder);
   } break;
   case JBV_ARRAY: {
     lua_newtable(L);
@@ -259,6 +238,8 @@ iwrc ejdb_lua_push_jbl_node(lua_State* L, JBL_NODE * node) {
     JBL_iterator it;
     int klen;
     if ((rc = jbl_create_iterator_holder(&holder)))
+      return rc;
+    if ((rc = jbl_iterator_init(*jbl, &it)))
       return rc;
     while (jbl_iterator_next(&it, holder, NULL, &klen)) {
       lua_pushinteger(L, klen + 1);
@@ -276,16 +257,8 @@ static iwrc ejdb_lua_visitor(EJDB_EXEC* ctx, const EJDB_DOC doc, int64_t* step) 
   lua_State* L = ctx->opaque;
   lua_pushvalue(L, 3);
   lua_pushinteger(L, doc->id);
-  printf("\n ejdb_lua_visitor----------------------------  "  );
-//  luaL_error("Invalid modechar木木要3333333333333333333333333",3);
-  if(doc->node){
-    if ((rc = ejdb_lua_push_jbl_node(L, &(doc->node))))
-      return rc;
-  }else{
-    if ((rc = ejdb_lua_push_jbl(L, &(doc->raw))))
-      return rc;
-  }
-
+  if ((rc = ejdb_lua_push_jbl(L, &(doc->raw))))
+    return rc;
   lua_call(L, 2, 0);
   return 0;
 }
@@ -371,7 +344,7 @@ int ejdb_lua_ejdb_put(lua_State* L) {
   iwrc rc;
   JBL jbl;
   int64_t id;
-  printf("ejdb_lua_ejdb_putaaaaaaaaaaaaaaaaaaaaaaaaaa    \n");
+  printf("aaaaaaaaaaaaaaaaaaaaaaaaaa    \n");
   EJDB* db = luaL_checkudata(L, 1, EJDB_DATABASE_META);
   int coll_idx = 2;
   bool use_index = false;
@@ -380,7 +353,7 @@ int ejdb_lua_ejdb_put(lua_State* L) {
     id = luaL_checkinteger(L, 2);
     coll_idx++;
   }
-  printf("ejdb_lua_ejdb_putbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb    \n");
+  printf("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb    \n");
   const char* collection = luaL_checkstring(L, coll_idx);
   EJDB_LUA_ASSERT(ejdb_lua_jbl_create(L, coll_idx + 1, &jbl));
   printf("ccccccccccccccccccccccccccccccccc    \n");
@@ -475,8 +448,6 @@ int ejdb_lua_ejdb_del(lua_State* L) {
   lua_pushinteger(L, index);
   return 1;
 }
-
-
 
 /// Delete a collection from the database
 // @function remove_collection
@@ -707,6 +678,7 @@ int tttest(lua_State* L) {
   finish:
   jql_destroy(&q);
   jbl_destroy(&jbl);
+//    Sleep(12000);
   printf("\n do close --------------------- \n");
   ejdb_close(&db);
   return 0;
